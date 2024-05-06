@@ -32,22 +32,16 @@ fn load_level(
     let layout = TextureAtlasLayout::from_grid(Vec2::splat(18.), 20, 9, None, None);
     let texture_atlas_layout = texture_atlas_layouts.add(layout);
 
-    // let texture_clone = texture.clone_weak();
-    // let texture_atlas_layout_clone = texture_atlas_layout.clone_weak();
-
     // Store texture + layout on tilemap strongly, children inherit weak
     let tilemap_entity = commands
         .spawn((
-            SpriteBundle {
+            SpatialBundle {
                 transform: Transform::from_xyz(0.0, 0.0, -1.0),
-                texture: texture.clone(),
                 visibility: Visibility::Hidden,
                 ..default()
             },
-            TextureAtlas {
-                layout: texture_atlas_layout.clone(),
-                index: 0,
-            },
+            texture.clone(),
+            texture_atlas_layout.clone(),
             Tilemap,
         ))
         .id();
