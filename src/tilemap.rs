@@ -65,7 +65,11 @@ fn load_level(
                     layout: texture_atlas_layout.clone_weak(),
                     index: 20,
                 },
-                Collider,
+                Collider {
+                    // TODO: Make these constants
+                    width: 16.0,
+                    height: 16.0,
+                },
             ))
             .id(),
     );

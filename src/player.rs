@@ -1,8 +1,5 @@
 use crate::collision::*;
-use bevy::{
-    math::bounding::{Aabb2d, IntersectsVolume},
-    prelude::*,
-};
+use bevy::{math::bounding::IntersectsVolume, prelude::*};
 
 #[derive(Component)]
 struct Player {
@@ -33,7 +30,11 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Player {
             velocity: (0.0, 0.0),
         },
-        Collider,
+        Collider {
+            // TODO: Make these constants
+            width: 16.0,
+            height: 16.0,
+        },
     ));
 
     // Some thing with a collider
@@ -110,28 +111,31 @@ fn update_player_velocity(
 }
 
 fn move_player(
-    mut player_query: Query<(&mut Player, &mut Transform)>,
-    collider_query: Query<&Transform, (With<Collider>, Without<Player>)>,
+    mut player_query: Query<(&mut Player, &mut Transform, &Collider)>,
+    collider_query: Query<(&Transform, &Collider), Without<Player>>,
 ) {
-    let (mut player, mut player_transform) = player_query.single_mut();
+    let (mut player, mut player_transform, player_collider) = player_query.single_mut();
 
     let next_player_pos = Vec2::new(
         player_transform.translation.x + player.velocity.0,
         player_transform.translation.y + player.velocity.1,
     );
-    let next_player_bounding_box = Aabb2d::new(next_player_pos, Vec2::new(8., 8.));
+    let next_player_bounding_box = player_collider.get_aabb2d(next_player_pos);
 
     // Collision detection
     let close_collider_transforms = collider_query
         .iter()
-        .filter(|transform| {
-            next_player_bounding_box.intersects(&Aabb2d::new(
-                transform.translation.truncate(),
-                Vec2::new(8., 8.),
-            ))
+        .filter(|(transform, collider)| {
+            next_player_bounding_box
+                .intersects(&collider.get_aabb2d(transform.translation.truncate()))
         })
-        .collect::<Vec<&Transform>>();
-    check_player_collision(&mut player, &player_transform, &close_collider_transforms);
+        .collect::<Vec<(&Transform, &Collider)>>();
+    check_player_collision(
+        &mut player,
+        &player_transform,
+        &player_collider,
+        &close_collider_transforms,
+    );
 
     player_transform.translation.x += player.velocity.0;
     player_transform.translation.y += player.velocity.1;
@@ -140,20 +144,17 @@ fn move_player(
 fn check_player_collision(
     player: &mut Player,
     player_transform: &Transform,
-    close_collider_transforms: &[&Transform],
+    player_collider: &Collider,
+    close_collider_transforms: &[(&Transform, &Collider)],
 ) {
-    // TODO: Make these constants
-    let player_half = Vec2::new(8., 8.);
-    let half = Vec2::new(8., 8.);
-
     let next_player_pos_y = Vec2::new(
         player_transform.translation.x,
         player_transform.translation.y + player.velocity.1,
     );
 
-    for &transform in close_collider_transforms {
-        let next_player_y_collider = Aabb2d::new(next_player_pos_y, player_half);
-        let collider = Aabb2d::new(transform.translation.truncate(), half);
+    for &(transform, collider) in close_collider_transforms {
+        let next_player_y_collider = player_collider.get_aabb2d(next_player_pos_y);
+        let collider = collider.get_aabb2d(transform.translation.truncate());
 
         if next_player_y_collider.intersects(&collider) {
             player.velocity.1 = 0.0;
@@ -166,9 +167,9 @@ fn check_player_collision(
         player_transform.translation.y,
     );
 
-    for &transform in close_collider_transforms {
-        let next_player_x_collider = Aabb2d::new(next_player_pos_x, player_half);
-        let collider = Aabb2d::new(transform.translation.truncate(), half);
+    for &(transform, collider) in close_collider_transforms {
+        let next_player_x_collider = player_collider.get_aabb2d(next_player_pos_x);
+        let collider = collider.get_aabb2d(transform.translation.truncate());
 
         if next_player_x_collider.intersects(&collider) {
             player.velocity.0 = 0.0;
