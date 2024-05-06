@@ -58,7 +58,7 @@ fn setup(mut commands: Commands) {
         projection: OrthographicProjection {
             near: -1000.0,
             far: 1000.0,
-            scale: 0.8,
+            scale: 0.3,
             ..default()
         },
         ..default()

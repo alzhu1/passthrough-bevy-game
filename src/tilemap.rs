@@ -1,3 +1,8 @@
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+};
+
 use crate::collision::Collider;
 use bevy::prelude::*;
 
@@ -15,7 +20,8 @@ impl Plugin for TilemapPlugin {
         // it will add? Maybe a tilemap bundle?
 
         // Probably some file reading
-        app.add_systems(PreStartup, load_level);
+        app.insert_resource(Msaa::Off)
+            .add_systems(PreStartup, load_level);
     }
 }
 
@@ -46,10 +52,46 @@ fn load_level(
         ))
         .id();
 
-    // TODO: Read in some level file based on a resource index
-    // For this level file, generate a bunch of Children entities to attach to tilemap_entity
-
     let mut tile_entities = vec![];
+
+    let file = File::open("assets/level1.txt").expect("No level found");
+    for (y, line) in BufReader::new(file).lines().enumerate() {
+        if let Ok(line) = line {
+            // for (x, char) in line.chars().enumerate() {
+
+            // }
+            for (x, c) in line.split(",").map(|c| c.trim()).enumerate() {
+                println!("X: {}, Y: {}, C: {}", x, y, c);
+                let x_pos = x as f32 * 16.0;
+                let y_pos = y as f32 * -16.0 - 80.0;
+
+                if let Ok(index) = c.parse::<usize>() {
+                    tile_entities.push(
+                        commands
+                            .spawn((
+                                SpriteBundle {
+                                    transform: Transform::from_xyz(x_pos, y_pos, 0.0)
+                                        .with_scale(Vec3::splat(8.0 / 9.0)),
+                                    texture: texture.clone_weak(),
+                                    visibility: Visibility::Visible,
+                                    ..default()
+                                },
+                                TextureAtlas {
+                                    layout: texture_atlas_layout.clone_weak(),
+                                    index,
+                                },
+                                Collider {
+                                    // TODO: Make these constants
+                                    width: 16.0,
+                                    height: 16.0,
+                                },
+                            ))
+                            .id(),
+                    );
+                }
+            }
+        }
+    }
 
     tile_entities.push(
         commands
