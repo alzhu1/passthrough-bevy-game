@@ -1,9 +1,11 @@
 use bevy::{math::bounding::Aabb2d, prelude::*};
 
-#[derive(Component)]
+#[derive(Component, Debug, Default)]
 pub struct Collider {
     pub width: f32,
     pub height: f32,
+    // Bitmask?
+    pub layer_mask: u8,
 }
 
 impl Collider {

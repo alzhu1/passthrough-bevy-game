@@ -1,13 +1,15 @@
+use crate::{
+    collision::Collider,
+    level::{Despawnable, LevelState},
+};
+use bevy::prelude::*;
 use std::{
     fs::File,
     io::{BufRead, BufReader},
 };
 
-use crate::{
-    collision::Collider,
-    state::{Despawnable, LevelState},
-};
-use bevy::prelude::*;
+const YELLOW_BLOCKS: [usize; 1] = [9];
+const BLUE_BLOCKS: [usize; 10] = [93, 94, 95, 113, 114, 115, 132, 133, 134, 135];
 
 #[derive(Component)]
 pub struct Tilemap;
@@ -65,11 +67,18 @@ fn load_level(
 
             // }
             for (x, c) in line.split(",").map(|c| c.trim()).enumerate() {
-                println!("X: {}, Y: {}, C: {}", x, y, c);
                 let x_pos = x as f32 * 16.0;
                 let y_pos = y as f32 * -16.0 - 80.0;
 
                 if let Ok(index) = c.parse::<usize>() {
+                    let layer_mask = if YELLOW_BLOCKS.contains(&index) {
+                        0b100
+                    } else if BLUE_BLOCKS.contains(&index) {
+                        0b10
+                    } else {
+                        1
+                    };
+
                     tile_entities.push(
                         commands
                             .spawn((
@@ -88,6 +97,7 @@ fn load_level(
                                     // TODO: Make these constants
                                     width: 16.0,
                                     height: 16.0,
+                                    layer_mask,
                                 },
                             ))
                             .id(),
@@ -96,29 +106,6 @@ fn load_level(
             }
         }
     }
-
-    tile_entities.push(
-        commands
-            .spawn((
-                SpriteBundle {
-                    transform: Transform::from_xyz(0.0, -48.0, 0.0)
-                        .with_scale(Vec3::splat(8.0 / 9.0)),
-                    texture: texture.clone_weak(),
-                    visibility: Visibility::Visible,
-                    ..default()
-                },
-                TextureAtlas {
-                    layout: texture_atlas_layout.clone_weak(),
-                    index: 20,
-                },
-                Collider {
-                    // TODO: Make these constants
-                    width: 16.0,
-                    height: 16.0,
-                },
-            ))
-            .id(),
-    );
 
     commands
         .entity(tilemap_entity)

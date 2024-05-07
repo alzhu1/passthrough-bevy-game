@@ -1,56 +1,98 @@
+use std::time::Duration;
+
 use crate::{
     collision::*,
-    state::{Despawnable, LevelState},
+    level::{Despawnable, LevelState},
 };
 use bevy::{math::bounding::IntersectsVolume, prelude::*};
 
-#[derive(Component)]
+const PLAYER_ANIMATION_SPEED: f32 = 0.2;
+
+// Not a Bevy state, should pertain only to Player
+#[derive(Default)]
+enum PlayerAnimationState {
+    #[default]
+    Idle,
+    Air,
+    Walk,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+enum PlayerType {
+    #[default]
+    Blue = 0,
+    Yellow = 2,
+}
+
+#[derive(Component, Default)]
 struct Player {
     velocity: (f32, f32),
+    can_jump: bool,
+    animation_state: PlayerAnimationState,
+    player_type: PlayerType,
 }
+
+#[derive(Component, Deref, DerefMut)]
+struct AnimationTimer(Timer);
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(LevelState::Init), setup)
+        app.add_systems(OnEnter(LevelState::Init), player_init)
             .add_systems(
                 FixedUpdate,
-                (update_player_velocity, move_player, camera_follow)
+                (handle_player_input, move_player, camera_follow)
                     .chain()
                     .run_if(in_state(LevelState::Play)),
-            );
+            )
+            .add_systems(Update, animate_player.run_if(in_state(LevelState::Play)));
     }
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn player_init(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
+) {
     // TODO: Figure out how to handle size. The character is 24x24
     let scale = 2.0 / 3.0;
 
+    let texture = asset_server.load("characters.png");
+    let layout = TextureAtlasLayout::from_grid(Vec2::splat(24.), 4, 1, None, None);
+    let texture_atlas_layout = texture_atlas_layouts.add(layout);
+
     commands.spawn((
         SpriteBundle {
-            texture: asset_server.load("character.png"),
+            texture,
             transform: Transform::from_scale(Vec3::splat(scale)),
             ..default()
         },
-        Player {
-            velocity: (0.0, 0.0),
+        TextureAtlas {
+            layout: texture_atlas_layout,
+            index: 0,
         },
+        Player::default(),
         Collider {
             // TODO: Make these constants
             width: 16.0,
             height: 16.0,
+            layer_mask: 0b11,
         },
+        AnimationTimer(Timer::from_seconds(
+            PLAYER_ANIMATION_SPEED,
+            TimerMode::Repeating,
+        )),
         Despawnable::default(),
     ));
 }
 
-fn update_player_velocity(
+fn handle_player_input(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut Player>,
+    mut query: Query<(&mut Player, &mut AnimationTimer, &mut Collider)>,
     mut next_state: ResMut<NextState<LevelState>>,
 ) {
-    let mut player = query.single_mut();
+    let (mut player, mut timer, mut collider) = query.single_mut();
     let mut direction = 0.0;
 
     if keyboard_input.pressed(KeyCode::ArrowLeft) {
@@ -64,21 +106,33 @@ fn update_player_velocity(
     player.velocity.0 = direction;
     player.velocity.1 -= 0.1;
 
-    if keyboard_input.pressed(KeyCode::Space) {
-        player.velocity.1 = 2.0;
+    if player.can_jump && keyboard_input.just_pressed(KeyCode::Space) {
+        player.velocity.1 = 2.5;
+        player.can_jump = false;
     }
 
     // Restart
-    if keyboard_input.pressed(KeyCode::KeyR) {
+    if keyboard_input.just_pressed(KeyCode::KeyR) {
         next_state.set(LevelState::End);
+    }
+
+    // Switch types
+    if keyboard_input.just_pressed(KeyCode::ShiftLeft) {
+        player.player_type = match player.player_type {
+            PlayerType::Blue => PlayerType::Yellow,
+            PlayerType::Yellow => PlayerType::Blue,
+        };
+        collider.layer_mask = (player.player_type as u8) + 3;
+        timer.tick(Duration::from_secs_f32(PLAYER_ANIMATION_SPEED));
     }
 }
 
 fn move_player(
-    mut player_query: Query<(&mut Player, &mut Transform, &Collider)>,
+    mut player_query: Query<(&mut Player, &mut Transform, &mut Sprite, &Collider)>,
     collider_query: Query<(&Transform, &Collider), Without<Player>>,
 ) {
-    let (mut player, mut player_transform, player_collider) = player_query.single_mut();
+    let (mut player, mut player_transform, mut player_sprite, player_collider) =
+        player_query.single_mut();
 
     let next_player_pos = Vec2::new(
         player_transform.translation.x + player.velocity.0,
@@ -90,16 +144,37 @@ fn move_player(
     let close_collider_transforms = collider_query
         .iter()
         .filter(|(transform, collider)| {
-            next_player_bounding_box
-                .intersects(&collider.get_aabb2d(transform.translation.truncate()))
+            // Layer mask check
+            (player_collider.layer_mask & collider.layer_mask != 0)
+                && next_player_bounding_box
+                    .intersects(&collider.get_aabb2d(transform.translation.truncate()))
         })
         .collect::<Vec<(&Transform, &Collider)>>();
-    check_player_collision(
+
+    // Technically means that bonking on ceiling allows you to jump
+    player.can_jump = check_player_collision(
         &mut player,
         &player_transform,
         &player_collider,
         &close_collider_transforms,
     );
+
+    if player.velocity.0 > 0.0 {
+        player_sprite.flip_x = true;
+    } else if player.velocity.0 < 0.0 {
+        player_sprite.flip_x = false;
+    }
+
+    // If a y collision occured, we are in Air state
+    // If we have velocity, we are in Walk state
+    // Otherwise we are in Idle state
+    player.animation_state = if !player.can_jump {
+        PlayerAnimationState::Air
+    } else if player.velocity.0.abs() > 0.0 {
+        PlayerAnimationState::Walk
+    } else {
+        PlayerAnimationState::Idle
+    };
 
     player_transform.translation.x += player.velocity.0;
     player_transform.translation.y += player.velocity.1;
@@ -110,7 +185,9 @@ fn check_player_collision(
     player_transform: &Transform,
     player_collider: &Collider,
     close_collider_transforms: &[(&Transform, &Collider)],
-) {
+) -> bool {
+    let mut y_collision = false;
+
     let next_player_pos_y = Vec2::new(
         player_transform.translation.x,
         player_transform.translation.y + player.velocity.1,
@@ -122,6 +199,7 @@ fn check_player_collision(
 
         if next_player_y_collider.intersects(&collider) {
             player.velocity.1 = 0.0;
+            y_collision = true;
             break;
         }
     }
@@ -140,6 +218,8 @@ fn check_player_collision(
             break;
         }
     }
+
+    y_collision
 }
 
 fn camera_follow(
@@ -153,4 +233,21 @@ fn camera_follow(
 
     camera_transform.translation.x = player_transform.translation.x;
     camera_transform.translation.y = player_transform.translation.y;
+}
+
+fn animate_player(
+    time: Res<Time>,
+    mut player_query: Query<(&Player, &mut AnimationTimer, &mut TextureAtlas)>,
+) {
+    let (player, mut timer, mut atlas) = player_query.single_mut();
+
+    timer.tick(time.delta());
+    if timer.just_finished() {
+        atlas.index = (player.player_type as usize)
+            + match player.animation_state {
+                PlayerAnimationState::Idle => 0,
+                PlayerAnimationState::Air => 1,
+                PlayerAnimationState::Walk => (atlas.index % 2 + 1) % 2,
+            };
+    }
 }

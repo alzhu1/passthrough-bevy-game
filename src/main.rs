@@ -2,36 +2,16 @@ use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 
 mod collision;
+mod level;
 mod player;
-mod state;
 mod tilemap;
 
+use level::{Fader, LevelState, LevelsPlugin};
 use player::PlayerPlugin;
-use state::{Fader, LevelState, StateDefaultsPlugin};
 use tilemap::TilemapPlugin;
 
-/* TODO: Need to figure out the following, probably in listed order:
-
-  * How to display/move around a sprite
-  * How to display a tile map (with culling, use Visibility?)
-  * How to have the camera follow the player
-  * Collisions
-
+/* TODO:
   Then think about the game jam theme (Changing Sides, optional restriction: The Chosen One)
-
-    TODO: More stuff:
-    * Implement level loading/transition logic. Basically need State transitions
-    * 4 states, probably LevelState enum:
-        * Init
-            * OnEnter: Start with black screen? and run all plugin init systems
-            * OnExit: Start fading the screen, move to play state
-        * Play
-            * OnEnter: Grant player control?
-            * Go to OnExit once restart is pressed or goal is reached
-        * End
-            * OnEnter: Fade to black?
-            * OnExit: Despawn all entities
-
 */
 
 fn main() {
@@ -42,7 +22,7 @@ fn main() {
             FrameTimeDiagnosticsPlugin::default(),
             PlayerPlugin,
             TilemapPlugin,
-            StateDefaultsPlugin,
+            LevelsPlugin,
         ))
         .add_systems(Startup, setup);
 

@@ -28,9 +28,9 @@ impl Despawnable {
 #[derive(Resource)]
 struct LevelTransitionTimer(Timer);
 
-pub struct StateDefaultsPlugin;
+pub struct LevelsPlugin;
 
-impl Plugin for StateDefaultsPlugin {
+impl Plugin for LevelsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(LevelTransitionTimer(Timer::from_seconds(
             FADE_DURATION,
