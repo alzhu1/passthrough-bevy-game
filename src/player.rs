@@ -1,4 +1,7 @@
-use crate::collision::*;
+use crate::{
+    collision::*,
+    state::{Despawnable, LevelState},
+};
 use bevy::{math::bounding::IntersectsVolume, prelude::*};
 
 #[derive(Component)]
@@ -10,10 +13,13 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup).add_systems(
-            FixedUpdate,
-            (update_player_velocity, move_player, camera_follow).chain(),
-        );
+        app.add_systems(OnEnter(LevelState::Init), setup)
+            .add_systems(
+                FixedUpdate,
+                (update_player_velocity, move_player, camera_follow)
+                    .chain()
+                    .run_if(in_state(LevelState::Play)),
+            );
     }
 }
 
@@ -35,61 +41,14 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             width: 16.0,
             height: 16.0,
         },
+        Despawnable::default(),
     ));
-
-    // Some thing with a collider
-    // commands.spawn((
-    //     SpriteBundle {
-    //         texture: asset_server.load("character.png"),
-    //         transform: Transform::from_xyz(0.0, -200.0, 0.0),
-    //         ..default()
-    //     },
-    //     Collider,
-    // ));
-
-    // // Some thing with a collider
-    // commands.spawn((
-    //     SpriteBundle {
-    //         texture: asset_server.load("character.png"),
-    //         transform: Transform::from_xyz(-24.0, -224.0, 0.0),
-    //         ..default()
-    //     },
-    //     Collider,
-    // ));
-    // // Some thing with a collider
-    // commands.spawn((
-    //     SpriteBundle {
-    //         texture: asset_server.load("character.png"),
-    //         transform: Transform::from_xyz(24.0, -224.0, 0.0),
-    //         ..default()
-    //     },
-    //     Collider,
-    // ));
-
-    // // Some thing with a collider
-    // commands.spawn((
-    //     SpriteBundle {
-    //         texture: asset_server.load("character.png"),
-    //         transform: Transform::from_xyz(48.0, -200.0, 0.0),
-    //         ..default()
-    //     },
-    //     Collider,
-    // ));
-
-    // // Some thing with a collider
-    // commands.spawn((
-    //     SpriteBundle {
-    //         texture: asset_server.load("character.png"),
-    //         transform: Transform::from_xyz(72.0, -200.0, 0.0),
-    //         ..default()
-    //     },
-    //     Collider,
-    // ));
 }
 
 fn update_player_velocity(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut query: Query<&mut Player>,
+    mut next_state: ResMut<NextState<LevelState>>,
 ) {
     let mut player = query.single_mut();
     let mut direction = 0.0;
@@ -107,6 +66,11 @@ fn update_player_velocity(
 
     if keyboard_input.pressed(KeyCode::Space) {
         player.velocity.1 = 2.0;
+    }
+
+    // Restart
+    if keyboard_input.pressed(KeyCode::KeyR) {
+        next_state.set(LevelState::End);
     }
 }
 

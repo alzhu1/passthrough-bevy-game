@@ -3,9 +3,11 @@ use bevy::prelude::*;
 
 mod collision;
 mod player;
+mod state;
 mod tilemap;
 
 use player::PlayerPlugin;
+use state::{Fader, LevelState, StateDefaultsPlugin};
 use tilemap::TilemapPlugin;
 
 /* TODO: Need to figure out the following, probably in listed order:
@@ -25,10 +27,8 @@ use tilemap::TilemapPlugin;
             * OnExit: Start fading the screen, move to play state
         * Play
             * OnEnter: Grant player control?
-        * Complete
-            * OnEnter: Fade to black? and increment some level index resource
-            * OnExit: Despawn all entities
-        * Restart
+            * Go to OnExit once restart is pressed or goal is reached
+        * End
             * OnEnter: Fade to black?
             * OnExit: Despawn all entities
 
@@ -36,13 +36,15 @@ use tilemap::TilemapPlugin;
 
 fn main() {
     let mut app = App::new();
-    app.add_plugins((
-        DefaultPlugins.set(ImagePlugin::default_nearest()),
-        FrameTimeDiagnosticsPlugin::default(),
-        PlayerPlugin,
-        TilemapPlugin,
-    ))
-    .add_systems(Startup, setup);
+    app.init_state::<LevelState>()
+        .add_plugins((
+            DefaultPlugins.set(ImagePlugin::default_nearest()),
+            FrameTimeDiagnosticsPlugin::default(),
+            PlayerPlugin,
+            TilemapPlugin,
+            StateDefaultsPlugin,
+        ))
+        .add_systems(Startup, setup);
 
     // #[cfg(debug_assertions)] // debug/dev builds only
     // {
@@ -63,4 +65,18 @@ fn setup(mut commands: Commands) {
         },
         ..default()
     });
+
+    commands.spawn((
+        NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            background_color: BackgroundColor(Color::BLACK),
+            visibility: Visibility::Visible,
+            ..default()
+        },
+        Fader,
+    ));
 }

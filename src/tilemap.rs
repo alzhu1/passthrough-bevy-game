@@ -3,7 +3,10 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-use crate::collision::Collider;
+use crate::{
+    collision::Collider,
+    state::{Despawnable, LevelState},
+};
 use bevy::prelude::*;
 
 #[derive(Component)]
@@ -21,7 +24,7 @@ impl Plugin for TilemapPlugin {
 
         // Probably some file reading
         app.insert_resource(Msaa::Off)
-            .add_systems(PreStartup, load_level);
+            .add_systems(OnEnter(LevelState::Init), load_level);
     }
 }
 
@@ -49,6 +52,7 @@ fn load_level(
             texture.clone(),
             texture_atlas_layout.clone(),
             Tilemap,
+            Despawnable::with_children(true),
         ))
         .id();
 
