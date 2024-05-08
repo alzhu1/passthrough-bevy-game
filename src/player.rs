@@ -242,7 +242,7 @@ fn check_goal_reached(
     player_query: Query<(&Transform, &Collider), With<Player>>,
     goal_query: Query<(&GlobalTransform, &Collider), With<Goal>>,
     mut next_state: ResMut<NextState<LevelState>>,
-    mut level_index: ResMut<LevelIndex>
+    mut level_index: ResMut<LevelIndex>,
 ) {
     let (player_transform, player_collider) = player_query.single();
     let player_bounding_box = player_collider.get_aabb2d(player_transform.translation.truncate());

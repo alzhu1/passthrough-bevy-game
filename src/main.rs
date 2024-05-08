@@ -4,10 +4,12 @@ mod collision;
 mod level;
 mod player;
 mod tilemap;
+mod ui;
 
 use level::{Fader, LevelState, LevelsPlugin};
 use player::PlayerPlugin;
 use tilemap::TilemapPlugin;
+use ui::UiPlugin;
 
 /* TODO:
   Then think about the game jam theme (Changing Sides, optional restriction: The Chosen One)
@@ -34,6 +36,7 @@ fn main() {
             PlayerPlugin,
             TilemapPlugin,
             LevelsPlugin,
+            UiPlugin,
             #[cfg(debug_assertions)]
             {
                 (
@@ -66,6 +69,7 @@ fn setup(mut commands: Commands) {
             },
             background_color: BackgroundColor(Color::BLACK),
             visibility: Visibility::Visible,
+            z_index: ZIndex::Global(0),
             ..default()
         },
         Fader,

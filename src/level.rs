@@ -29,12 +29,13 @@ impl Despawnable {
     }
 }
 
-#[derive(Resource)]
-pub struct LevelIndex(pub u8);
+#[derive(Resource, Default)]
+pub struct LevelIndex(pub u8, pub bool);
 
 impl LevelIndex {
     pub fn to_next_level(&mut self) {
         self.0 = (self.0 + 1) % LEVEL_COUNT;
+        self.1 = true;
     }
 }
 
@@ -49,7 +50,7 @@ impl Plugin for LevelsPlugin {
             FADE_DURATION,
             TimerMode::Repeating,
         )))
-        .insert_resource(LevelIndex(0))
+        .insert_resource(LevelIndex::default())
         .add_systems(Update, level_transition.run_if(in_transition_state))
         .add_systems(OnExit(LevelState::End), (cleanup_entities, reset_camera));
     }

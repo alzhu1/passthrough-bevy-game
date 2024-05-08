@@ -37,7 +37,7 @@ fn load_level(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
-    level_index: Res<LevelIndex>
+    level_index: Res<LevelIndex>,
 ) {
     // TODO: Use asset server to fetch some config file (tilemap?)
     // Config file should have info for tile type + tile collision if any
@@ -86,7 +86,11 @@ fn load_level(
                     // Should be the door
                     let is_trigger = index == 110 || index == 130;
                     // TODO: Make these constants
-                    let size = if is_trigger { GOAL_COLLIDER_SIZE } else { TILE_SIZE };
+                    let size = if is_trigger {
+                        GOAL_COLLIDER_SIZE
+                    } else {
+                        TILE_SIZE
+                    };
 
                     let mut tile_entity = commands.spawn((
                         SpriteBundle {
