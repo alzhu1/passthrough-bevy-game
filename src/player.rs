@@ -2,11 +2,13 @@ use std::time::Duration;
 
 use crate::{
     collision::*,
-    level::{Despawnable, LevelState},
+    level::{Despawnable, Goal, LevelIndex, LevelState},
 };
 use bevy::{math::bounding::IntersectsVolume, prelude::*};
 
 const PLAYER_ANIMATION_SPEED: f32 = 0.2;
+const PLAYER_COLLIDER_SIZE: f32 = 14.0;
+const PLAYER_SCALE: f32 = 2.0 / 3.0;
 
 // Not a Bevy state, should pertain only to Player
 #[derive(Default)]
@@ -46,7 +48,10 @@ impl Plugin for PlayerPlugin {
                     .chain()
                     .run_if(in_state(LevelState::Play)),
             )
-            .add_systems(Update, animate_player.run_if(in_state(LevelState::Play)));
+            .add_systems(
+                Update,
+                (animate_player, check_goal_reached).run_if(in_state(LevelState::Play)),
+            );
     }
 }
 
@@ -55,9 +60,6 @@ fn player_init(
     asset_server: Res<AssetServer>,
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
-    // TODO: Figure out how to handle size. The character is 24x24
-    let scale = 2.0 / 3.0;
-
     let texture = asset_server.load("characters.png");
     let layout = TextureAtlasLayout::from_grid(Vec2::splat(24.), 4, 1, None, None);
     let texture_atlas_layout = texture_atlas_layouts.add(layout);
@@ -65,7 +67,7 @@ fn player_init(
     commands.spawn((
         SpriteBundle {
             texture,
-            transform: Transform::from_scale(Vec3::splat(scale)),
+            transform: Transform::from_scale(Vec3::splat(PLAYER_SCALE)),
             ..default()
         },
         TextureAtlas {
@@ -74,10 +76,10 @@ fn player_init(
         },
         Player::default(),
         Collider {
-            // TODO: Make these constants
-            width: 16.0,
-            height: 16.0,
+            width: PLAYER_COLLIDER_SIZE,
+            height: PLAYER_COLLIDER_SIZE,
             layer_mask: 0b11,
+            is_trigger: false,
         },
         AnimationTimer(Timer::from_seconds(
             PLAYER_ANIMATION_SPEED,
@@ -129,7 +131,7 @@ fn handle_player_input(
 
 fn move_player(
     mut player_query: Query<(&mut Player, &mut Transform, &mut Sprite, &Collider)>,
-    collider_query: Query<(&Transform, &Collider), Without<Player>>,
+    collider_query: Query<(&GlobalTransform, &Collider), Without<Player>>,
 ) {
     let (mut player, mut player_transform, mut player_sprite, player_collider) =
         player_query.single_mut();
@@ -146,10 +148,11 @@ fn move_player(
         .filter(|(transform, collider)| {
             // Layer mask check
             (player_collider.layer_mask & collider.layer_mask != 0)
+                && !collider.is_trigger
                 && next_player_bounding_box
-                    .intersects(&collider.get_aabb2d(transform.translation.truncate()))
+                    .intersects(&collider.get_aabb2d(transform.translation().truncate()))
         })
-        .collect::<Vec<(&Transform, &Collider)>>();
+        .collect::<Vec<(&GlobalTransform, &Collider)>>();
 
     // Technically means that bonking on ceiling allows you to jump
     player.can_jump = check_player_collision(
@@ -184,7 +187,7 @@ fn check_player_collision(
     player: &mut Player,
     player_transform: &Transform,
     player_collider: &Collider,
-    close_collider_transforms: &[(&Transform, &Collider)],
+    close_collider_transforms: &[(&GlobalTransform, &Collider)],
 ) -> bool {
     let mut y_collision = false;
 
@@ -195,7 +198,7 @@ fn check_player_collision(
 
     for &(transform, collider) in close_collider_transforms {
         let next_player_y_collider = player_collider.get_aabb2d(next_player_pos_y);
-        let collider = collider.get_aabb2d(transform.translation.truncate());
+        let collider = collider.get_aabb2d(transform.translation().truncate());
 
         if next_player_y_collider.intersects(&collider) {
             player.velocity.1 = 0.0;
@@ -211,7 +214,7 @@ fn check_player_collision(
 
     for &(transform, collider) in close_collider_transforms {
         let next_player_x_collider = player_collider.get_aabb2d(next_player_pos_x);
-        let collider = collider.get_aabb2d(transform.translation.truncate());
+        let collider = collider.get_aabb2d(transform.translation().truncate());
 
         if next_player_x_collider.intersects(&collider) {
             player.velocity.0 = 0.0;
@@ -233,6 +236,26 @@ fn camera_follow(
 
     camera_transform.translation.x = player_transform.translation.x;
     camera_transform.translation.y = player_transform.translation.y;
+}
+
+fn check_goal_reached(
+    player_query: Query<(&Transform, &Collider), With<Player>>,
+    goal_query: Query<(&GlobalTransform, &Collider), With<Goal>>,
+    mut next_state: ResMut<NextState<LevelState>>,
+    mut level_index: ResMut<LevelIndex>
+) {
+    let (player_transform, player_collider) = player_query.single();
+    let player_bounding_box = player_collider.get_aabb2d(player_transform.translation.truncate());
+
+    for (goal_transform, goal_collider) in &goal_query {
+        let goal_bounding_box = goal_collider.get_aabb2d(goal_transform.translation().truncate());
+
+        if player_bounding_box.intersects(&goal_bounding_box) {
+            // We win
+            level_index.to_next_level();
+            next_state.set(LevelState::End);
+        }
+    }
 }
 
 fn animate_player(

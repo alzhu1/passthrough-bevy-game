@@ -1,4 +1,3 @@
-use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 
 mod collision;
@@ -12,6 +11,19 @@ use tilemap::TilemapPlugin;
 
 /* TODO:
   Then think about the game jam theme (Changing Sides, optional restriction: The Chosen One)
+
+  Final things to do before ship:
+
+  * Goal condition (once the door is reached, go to next level)
+    * Probably will need to extend the Collider with an is_trigger bool
+    * Loop back to the beginning
+  * Tutorial UI? Just some text for controls should be enough
+  * Sounds
+    * BGM
+    * Sound effect for jumping
+    * (not sure) SFX for walking
+  * Make 2-3 levels, more if possible
+
 */
 
 fn main() {
@@ -19,20 +31,19 @@ fn main() {
     app.init_state::<LevelState>()
         .add_plugins((
             DefaultPlugins.set(ImagePlugin::default_nearest()),
-            FrameTimeDiagnosticsPlugin::default(),
             PlayerPlugin,
             TilemapPlugin,
             LevelsPlugin,
+            #[cfg(debug_assertions)]
+            {
+                (
+                    bevy::diagnostic::FrameTimeDiagnosticsPlugin::default(),
+                    bevy::diagnostic::LogDiagnosticsPlugin::default(),
+                )
+            },
         ))
-        .add_systems(Startup, setup);
-
-    // #[cfg(debug_assertions)] // debug/dev builds only
-    // {
-    //     use bevy::diagnostic::LogDiagnosticsPlugin;
-    //     app.add_plugins(LogDiagnosticsPlugin::default());
-    // }
-
-    app.run();
+        .add_systems(Startup, setup)
+        .run();
 }
 
 fn setup(mut commands: Commands) {

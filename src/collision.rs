@@ -6,6 +6,7 @@ pub struct Collider {
     pub height: f32,
     // Bitmask?
     pub layer_mask: u8,
+    pub is_trigger: bool,
 }
 
 impl Collider {

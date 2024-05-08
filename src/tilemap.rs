@@ -1,6 +1,6 @@
 use crate::{
     collision::Collider,
-    level::{Despawnable, LevelState},
+    level::{Despawnable, Goal, LevelIndex, LevelState},
 };
 use bevy::prelude::*;
 use std::{
@@ -10,6 +10,9 @@ use std::{
 
 const YELLOW_BLOCKS: [usize; 1] = [9];
 const BLUE_BLOCKS: [usize; 10] = [93, 94, 95, 113, 114, 115, 132, 133, 134, 135];
+
+const TILE_SIZE: f32 = 16.0;
+const GOAL_COLLIDER_SIZE: f32 = 1.0;
 
 #[derive(Component)]
 pub struct Tilemap;
@@ -34,6 +37,7 @@ fn load_level(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
+    level_index: Res<LevelIndex>
 ) {
     // TODO: Use asset server to fetch some config file (tilemap?)
     // Config file should have info for tile type + tile collision if any
@@ -47,7 +51,7 @@ fn load_level(
     let tilemap_entity = commands
         .spawn((
             SpatialBundle {
-                transform: Transform::from_xyz(0.0, 0.0, -1.0),
+                transform: Transform::from_xyz(-4.0 * TILE_SIZE, 3.0 * TILE_SIZE, -1.0),
                 visibility: Visibility::Hidden,
                 ..default()
             },
@@ -60,7 +64,7 @@ fn load_level(
 
     let mut tile_entities = vec![];
 
-    let file = File::open("assets/level1.txt").expect("No level found");
+    let file = File::open(format!("assets/level{}.txt", level_index.0)).expect("No level found");
     for (y, line) in BufReader::new(file).lines().enumerate() {
         if let Ok(line) = line {
             // for (x, char) in line.chars().enumerate() {
@@ -68,7 +72,7 @@ fn load_level(
             // }
             for (x, c) in line.split(",").map(|c| c.trim()).enumerate() {
                 let x_pos = x as f32 * 16.0;
-                let y_pos = y as f32 * -16.0 - 80.0;
+                let y_pos = y as f32 * -16.0;
 
                 if let Ok(index) = c.parse::<usize>() {
                     let layer_mask = if YELLOW_BLOCKS.contains(&index) {
@@ -79,29 +83,36 @@ fn load_level(
                         1
                     };
 
-                    tile_entities.push(
-                        commands
-                            .spawn((
-                                SpriteBundle {
-                                    transform: Transform::from_xyz(x_pos, y_pos, 0.0)
-                                        .with_scale(Vec3::splat(8.0 / 9.0)),
-                                    texture: texture.clone_weak(),
-                                    visibility: Visibility::Visible,
-                                    ..default()
-                                },
-                                TextureAtlas {
-                                    layout: texture_atlas_layout.clone_weak(),
-                                    index,
-                                },
-                                Collider {
-                                    // TODO: Make these constants
-                                    width: 16.0,
-                                    height: 16.0,
-                                    layer_mask,
-                                },
-                            ))
-                            .id(),
-                    );
+                    // Should be the door
+                    let is_trigger = index == 110 || index == 130;
+                    // TODO: Make these constants
+                    let size = if is_trigger { GOAL_COLLIDER_SIZE } else { TILE_SIZE };
+
+                    let mut tile_entity = commands.spawn((
+                        SpriteBundle {
+                            transform: Transform::from_xyz(x_pos, y_pos, 0.0)
+                                .with_scale(Vec3::splat(8.0 / 9.0)),
+                            texture: texture.clone_weak(),
+                            visibility: Visibility::Visible,
+                            ..default()
+                        },
+                        TextureAtlas {
+                            layout: texture_atlas_layout.clone_weak(),
+                            index,
+                        },
+                        Collider {
+                            width: size,
+                            height: size,
+                            layer_mask,
+                            is_trigger,
+                        },
+                    ));
+
+                    if is_trigger {
+                        tile_entity.insert(Goal);
+                    }
+
+                    tile_entities.push(tile_entity.id());
                 }
             }
         }

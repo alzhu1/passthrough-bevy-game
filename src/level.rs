@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 const FADE_DURATION: f32 = 0.5;
+const LEVEL_COUNT: u8 = 2;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 pub enum LevelState {
@@ -9,6 +10,9 @@ pub enum LevelState {
     Play,
     End,
 }
+
+#[derive(Component)]
+pub struct Goal;
 
 // To track despawn
 #[derive(Component, Default)]
@@ -26,6 +30,15 @@ impl Despawnable {
 }
 
 #[derive(Resource)]
+pub struct LevelIndex(pub u8);
+
+impl LevelIndex {
+    pub fn to_next_level(&mut self) {
+        self.0 = (self.0 + 1) % LEVEL_COUNT;
+    }
+}
+
+#[derive(Resource)]
 struct LevelTransitionTimer(Timer);
 
 pub struct LevelsPlugin;
@@ -36,6 +49,7 @@ impl Plugin for LevelsPlugin {
             FADE_DURATION,
             TimerMode::Repeating,
         )))
+        .insert_resource(LevelIndex(0))
         .add_systems(Update, level_transition.run_if(in_transition_state))
         .add_systems(OnExit(LevelState::End), (cleanup_entities, reset_camera));
     }
