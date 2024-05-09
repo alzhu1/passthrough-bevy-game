@@ -37,11 +37,23 @@ struct Player {
 #[derive(Component, Deref, DerefMut)]
 struct AnimationTimer(Timer);
 
+#[derive(Event, Default)]
+pub struct JumpEvent;
+
+#[derive(Event, Default)]
+pub struct SwitchEvent;
+
+#[derive(Event, Default)]
+pub struct GoalEvent;
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(LevelState::Init), player_init)
+        app.add_event::<JumpEvent>()
+            .add_event::<SwitchEvent>()
+            .add_event::<GoalEvent>()
+            .add_systems(OnEnter(LevelState::Init), player_init)
             .add_systems(
                 FixedUpdate,
                 (handle_player_input, move_player, camera_follow)
@@ -93,6 +105,8 @@ fn handle_player_input(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut query: Query<(&mut Player, &mut AnimationTimer, &mut Collider)>,
     mut next_state: ResMut<NextState<LevelState>>,
+    mut jump_event_writer: EventWriter<JumpEvent>,
+    mut switch_event_writer: EventWriter<SwitchEvent>,
 ) {
     let (mut player, mut timer, mut collider) = query.single_mut();
     let mut direction = 0.0;
@@ -111,6 +125,7 @@ fn handle_player_input(
     if player.can_jump && keyboard_input.just_pressed(KeyCode::Space) {
         player.velocity.1 = 2.5;
         player.can_jump = false;
+        jump_event_writer.send_default();
     }
 
     // Restart
@@ -126,6 +141,7 @@ fn handle_player_input(
         };
         collider.layer_mask = (player.player_type as u8) + 3;
         timer.tick(Duration::from_secs_f32(PLAYER_ANIMATION_SPEED));
+        switch_event_writer.send_default();
     }
 }
 
@@ -243,6 +259,7 @@ fn check_goal_reached(
     goal_query: Query<(&GlobalTransform, &Collider), With<Goal>>,
     mut next_state: ResMut<NextState<LevelState>>,
     mut level_index: ResMut<LevelIndex>,
+    mut goal_event_writer: EventWriter<GoalEvent>,
 ) {
     let (player_transform, player_collider) = player_query.single();
     let player_bounding_box = player_collider.get_aabb2d(player_transform.translation.truncate());
@@ -253,6 +270,7 @@ fn check_goal_reached(
         if player_bounding_box.intersects(&goal_bounding_box) {
             // We win
             level_index.to_next_level();
+            goal_event_writer.send_default();
             next_state.set(LevelState::End);
         }
     }
