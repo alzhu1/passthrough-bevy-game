@@ -10,6 +10,9 @@ const PLAYER_ANIMATION_SPEED: f32 = 0.2;
 const PLAYER_COLLIDER_SIZE: f32 = 14.0;
 const PLAYER_SCALE: f32 = 2.0 / 3.0;
 
+const GRAVITY: f32 = 0.1;
+const JUMP_VELOCITY: f32 = 2.5;
+
 // Not a Bevy state, should pertain only to Player
 #[derive(Default)]
 enum PlayerAnimationState {
@@ -120,10 +123,10 @@ fn handle_player_input(
     }
 
     player.velocity.0 = direction;
-    player.velocity.1 -= 0.1;
+    player.velocity.1 -= GRAVITY;
 
     if player.can_jump && keyboard_input.just_pressed(KeyCode::Space) {
-        player.velocity.1 = 2.5;
+        player.velocity.1 = JUMP_VELOCITY;
         player.can_jump = false;
         jump_event_writer.send_default();
     }
