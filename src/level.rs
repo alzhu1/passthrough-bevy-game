@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 const FADE_DURATION: f32 = 0.5;
-const LEVEL_COUNT: u8 = 2;
+const LEVEL_COUNT: u8 = 3;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 pub enum LevelState {

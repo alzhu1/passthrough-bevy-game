@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{asset::AssetMetaCheck, prelude::*};
 
 mod audio;
 mod collision;
@@ -13,14 +13,10 @@ use player::PlayerPlugin;
 use tilemap::TilemapPlugin;
 use ui::UiPlugin;
 
-/* TODO:
-  * Make 2-3 levels, more if possible
-
-*/
-
 fn main() {
     let mut app = App::new();
     app.init_state::<LevelState>()
+        .insert_resource(AssetMetaCheck::Never)
         .add_plugins((
             DefaultPlugins.set(ImagePlugin::default_nearest()),
             AudioPlugin,
